@@ -3,4 +3,15 @@ name = "the_net"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "net"
+path = "src/main.rs"
+
 [dependencies]
+anyhow = "1.0.105"
+clap = { version = "4.6.10", features = ["derive", "env"] }
+iroh = "1.5.0"
+n0-future = "0.3.2"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "signal"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
