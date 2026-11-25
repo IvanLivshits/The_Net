@@ -1,0 +1,75 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-apple-darwin # Apple Silicon
+            os: macos-latest
+          - target: x86_64-apple-darwin # Intel Mac, cross-compiled on the ARM runner
+            os: macos-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add ${{ matrix.target }}
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ matrix.target }}-
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      # Artifacts are zipped without Unix permissions, so the Unix binaries go
+      # into a tarball to keep the executable bit.
+      - name: Package
+        run: |
+          mkdir dist
+          cd target/${{ matrix.target }}/release
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp net.exe "$GITHUB_WORKSPACE/dist/"
+          else
+            tar czf "$GITHUB_WORKSPACE/dist/net-${{ matrix.target }}.tar.gz" net
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: net-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
